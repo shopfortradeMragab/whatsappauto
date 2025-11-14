@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WhatsApp Auto - Dashboard</title>
+    <style>
+      body {
+        font-family: Arial;
+        margin: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #25d366;
+      }
+      .status {
+        background: #e8f5e9;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .form-group {
+        margin: 15px 0;
+      }
+      label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      button {
+        background: #25d366;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #1fa857;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>WhatsApp Auto Bot</h1>
+      <div class="status">Status: <strong id="status">Loading...</strong></div>
+
+      <form id="configForm">
+        <div class="form-group">
+          <label>Auto Reply Message:</label>
+          <textarea
+            id="replyMessage"
+            placeholder="Enter reply message"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Message Delay (ms):</label>
+          <input type="number" id="messageDelay" value="1000" />
+        </div>
+
+        <div class="form-group">
+          <label
+            ><input type="checkbox" id="autoReply" /> Enable Auto Reply</label
+          >
+        </div>
+
+        <button type="submit">Save Settings</button>
+      </form>
+    </div>
+
+    <script>
+      // Load status
+      fetch("/api/status")
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById("status").textContent = data.status;
+          document.getElementById("replyMessage").value =
+            data.config.replyMessage;
+          document.getElementById("messageDelay").value =
+            data.config.messageDelay;
+          document.getElementById("autoReply").checked = data.config.autoReply;
+        });
+
+      // Save settings
+      document
+        .getElementById("configForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await fetch("/api/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              replyMessage: document.getElementById("replyMessage").value,
+              messageDelay: parseInt(
+                document.getElementById("messageDelay").value
+              ),
+              autoReply: document.getElementById("autoReply").checked,
+            }),
+          });
+          alert("Settings saved!");
+        });
+    </script>
+  </body>
+</html>

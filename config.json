@@ -1,0 +1,8 @@
+{
+  "messageDelay": 1000,
+  "autoReply": true,
+  "replyMessage": "Thanks for your message! We'll respond soon.",
+  "headless": true,
+  "sessionPath": "./sessions",
+  "port": 3000
+}
