@@ -1,14 +1,15 @@
 {
   "name": "whatsappauto",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "launcher.js",
+  "bin": "launcher.js",
   "scripts": {
     "start": "concurrently \"node server.js\" \"node index.js\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "WhatsApp Auto Bot with Dashboard",
   "dependencies": {
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.34.2",
@@ -16,5 +17,21 @@
     "express": "^4.18.2",
     "ejs": "^3.1.8",
     "concurrently": "^7.6.0"
+  },
+  "pkg": {
+    "scripts": [
+      "launcher.js",
+      "server.js",
+      "index.js"
+    ],
+    "assets": [
+      "views/**/*",
+      "config.json",
+      "users.json"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
   }
 }
