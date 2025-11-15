@@ -4,13 +4,23 @@
       "clientId": "client1",
       "password": "password123",
       "email": "user1@example.com",
-      "plan": "basic"
+      "plan": "basic",
+      "config": {
+        "messageDelay": 1000,
+        "autoReply": true,
+        "replyMessage": "Thanks for your message! We'll respond soon.",
+        "headless": true}
     },
     {
       "clientId": "client2",
       "password": "password456",
       "email": "user2@example.com",
-      "plan": "pro"
+      "plan": "pro",
+      "config": {
+        "messageDelay": 1000,
+        "autoReply": true,
+        "replyMessage": "Thanks for your message! We'll respond soon.",
+        "headless": true}
     }
   ]
 }
