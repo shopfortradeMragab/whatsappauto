@@ -1,7 +1,8 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-
+require("./index"); // Ensure index.js runs in the same process
+const { getQRCodeData } = require("./index"); // Import the getter function
 const config = JSON.parse(fs.readFileSync("./config.json"));
 const users = JSON.parse(fs.readFileSync("./users.json"));
 
@@ -86,6 +87,16 @@ app.get("/api/plans", (req, res) => {
       enterprise: { price: 99.99, messages: "unlimited" },
     },
   });
+});
+
+// Serve the QR code
+app.get("/api/qr", (req, res) => {
+  const qrCodeData = getQRCodeData(); // Get the latest QR code data
+  if (qrCodeData) {
+    res.json({ success: true, qrCode: qrCodeData });
+  } else {
+    res.json({ success: false, message: "QR code not available yet." });
+  }
 });
 
 app.listen(config.port, () => {

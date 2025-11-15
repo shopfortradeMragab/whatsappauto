@@ -1,7 +1,9 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
+const qrcode = require("qrcode");
 const fs = require("fs");
 const config = JSON.parse(fs.readFileSync("./config.json"));
+
+let qrCodeData = ""; // Store the QR code data
 
 const client = new Client({
   puppeteer: {
@@ -11,8 +13,9 @@ const client = new Client({
   authStrategy: new LocalAuth({ clientId: "client-one" }),
 });
 
-client.on("qr", (qr) => {
-  qrcode.generate(qr, { small: true });
+client.on("qr", async (qr) => {
+  qrCodeData = await qrcode.toDataURL(qr); // Convert QR to a Data URL
+  console.log("QR Code Data URL:", qrCodeData); // Log the QR code to the console
   console.log("QR received, scan please!");
 });
 
@@ -34,3 +37,8 @@ client.on("disconnected", (reason) => {
 });
 
 client.initialize();
+
+// Export a getter function for qrCodeData
+module.exports = {
+  getQRCodeData: () => qrCodeData,
+};

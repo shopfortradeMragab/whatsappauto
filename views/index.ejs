@@ -64,6 +64,7 @@
         border-radius: 5px;
         margin: 15px 0;
         border-left: 4px solid #25d366;
+        white-space: pre-wrap; /* Ensures text wrapping for status */
       }
       .form-group {
         margin: 15px 0;
@@ -84,6 +85,7 @@
       textarea {
         resize: vertical;
         min-height: 80px;
+        white-space: pre-wrap; /* Ensures text wrapping */
       }
       button {
         background: #25d366;
@@ -130,6 +132,7 @@
         margin: 10px 0;
         border-radius: 4px;
         display: none;
+        white-space: pre-wrap; /* Ensures text wrapping for alerts */
       }
       .alert.success {
         background: #c8e6c9;
@@ -151,6 +154,7 @@
         <a onclick="showSection('dashboard')">Dashboard</a>
         <a onclick="showSection('settings')">Settings</a>
         <a onclick="showSection('plans')">Plans</a>
+        <a id="qrTab" onclick="showQRTab()" style="display: none;">QR Code</a>
         <button class="logout-btn" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -276,42 +280,57 @@
       <div class="pricing-grid" id="plansGrid"></div>
     </div>
 
+    <!-- QR Code Section -->
+    <div id="qr-container" style="display: none;">
+      <h3>Scan the QR Code</h3>
+      <img id="qr-code" src="" alt="QR Code" />
+    </div>
+
+    <div class="container hidden" id="qrSection">
+      <h1>QR Code</h1>
+      <div id="qr-container" style="display: none;">
+        <h3>Scan the QR Code</h3>
+        <img id="qr-code" src="" alt="QR Code" />
+      </div>
+      <div id="qr-message" style="color: red; display: none;">QR code not available yet.</div>
+    </div>
+
     <script>
       let currentClientId = null;
 
       // Login form submission
-      document
-        .getElementById("loginForm")
-        .addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const clientId = document.getElementById("clientId").value;
-          const password = document.getElementById("password").value;
+      document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const clientId = document.getElementById("clientId").value;
+        const password = document.getElementById("password").value;
 
-          const response = await fetch("/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clientId, password }),
-          });
-
-          const data = await response.json();
-          const alert = document.getElementById("loginAlert");
-
-          if (data.success) {
-            currentClientId = clientId;
-            alert.textContent = "Login successful!";
-            alert.className = "alert success";
-            setTimeout(() => {
-              document.getElementById("loginSection").classList.add("hidden");
-              document.getElementById("navbar").style.display = "flex";
-              document.getElementById("currentClientId").textContent = clientId;
-              showSection("dashboard");
-              loadStatus();
-            }, 1000);
-          } else {
-            alert.textContent = data.message || "Login failed!";
-            alert.className = "alert error";
-          }
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId, password }),
         });
+
+        const data = await response.json();
+        const alert = document.getElementById("loginAlert");
+
+        if (data.success) {
+          currentClientId = clientId;
+          alert.textContent = "Login successful!";
+          alert.className = "alert success";
+          setTimeout(() => {
+            document.getElementById("loginSection").classList.add("hidden");
+            document.getElementById("navbar").style.display = "flex";
+            document.getElementById("currentClientId").textContent = clientId;
+            document.getElementById("qrTab").style.display = "inline"; // Show QR Code tab
+            showSection("dashboard");
+            loadStatus();
+            fetchQRCode();
+          }, 1000);
+        } else {
+          alert.textContent = data.message || "Login failed!";
+          alert.className = "alert error";
+        }
+      });
 
       // Show/Hide sections
       function showSection(section) {
@@ -395,6 +414,7 @@
         document.getElementById("loginSection").classList.remove("hidden");
         document.getElementById("navbar").style.display = "none";
         document.getElementById("loginForm").reset();
+        document.getElementById("qrTab").style.display = "none"; // Hide QR Code tab
       }
 
       // Show login or registration tab
@@ -433,6 +453,34 @@
           alert.className = "alert error";
         }
       });
+
+      // Fetch QR Code
+      async function fetchQRCode() {
+        const response = await fetch("/api/qr");
+        const data = await response.json();
+        const qrContainer = document.getElementById("qr-container");
+        const qrMessage = document.getElementById("qr-message");
+        const qrCodeImg = document.getElementById("qr-code");
+
+        if (data.success) {
+          qrCodeImg.src = data.qrCode;
+          qrContainer.style.display = "block";
+          qrMessage.style.display = "none";
+        } else {
+          qrContainer.style.display = "none";
+          qrMessage.style.display = "block";
+          qrMessage.textContent = data.message;
+        }
+      }
+
+      // Poll for QR code updates every 5 seconds
+      setInterval(fetchQRCode, 5000);
+
+      // Show QR Code tab
+      function showQRTab() {
+        showSection("qr");
+        fetchQRCode(); // Fetch the QR code immediately when the tab is opened
+      }
     </script>
   </body>
 </html>
