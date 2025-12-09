@@ -1,22 +1,17 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-require("./index"); // Ensure index.js runs in the same process
-const { getQRCodeData, generateClient } = require("./index"); // Import the getter function
-const { initDB, getUserByName } = require("./sqlite");
-const { generate } = require("qrcode-terminal");
+const { generateClient, getQRCodeData } = require("./index");
+const { initDB, getUserByName, addUser } = require("./sqlite");
 const config = JSON.parse(fs.readFileSync("./config.json"));
-// const users = JSON.parse(fs.readFileSync("./users.json"));
-// require("./sqlite");
 
 const app = express();
 app.use(express.static("public"));
 app.use(express.json());
 app.set("view engine", "ejs");
 
-// Store client sessions
-const clients = [];
-const db = initDB();
+const clients = []; // list of logged-in clientIds
+let dbInstance;
 
 // Dashboard page
 app.get("/", (req, res) => {
@@ -26,22 +21,23 @@ app.get("/", (req, res) => {
 // Client login
 app.post("/api/login", (req, res) => {
   const { clientId, password } = req.body;
+  console.log(clientId + password);
   let user = null;
-  db.then((db) =>
+  initDB().then((db) =>
     getUserByName(db, clientId).then((dbUser) => {
       if (dbUser && dbUser.password === password) {
         user = { clientId: dbUser.name, plan: "basic" }; // Assuming a default plan
+        console.log(dbUser);
         clients.push(user);
-        generateClient(); // Generate a new client session
-      }
-      // const user = users.users.find(
-      //   (u) => u.clientId === clientId && u.password === password
-      // );
+        generateClient(user.clientId); // Generate a new client session
+        // const user = users.users.find(
+        //   (u) => u.clientId === clientId && u.password === password
+        // );
 
-      // if (user) {
-      //   clients[clientId] = { connected: false, config: {}, plan: user.plan };
-      //   res.json({ success: true, clientId, plan: user.plan });}
-      else {
+        // if (user) {
+        //   clients[clientId] = { connected: false, config: {}, plan: user.plan };
+        res.json({ success: true, clientId, plan: user.plan });
+      } else {
         res.json({ success: false, message: "Invalid credentials" });
       }
     })
@@ -51,69 +47,58 @@ app.post("/api/login", (req, res) => {
 // Register new client
 app.post("/api/register", (req, res) => {
   const { clientId, password, email } = req.body;
-  const existingUser = users.users.find((u) => u.clientId === clientId);
-
-  if (existingUser) {
-    res.json({ success: false, message: "Client ID already exists" });
-    return;
+  try {
+    let exists;
+    getUserByName(dbInstance, clientId).then((dbUser) => {
+      exists = dbUser ? true : false;
+    });
+    if (exists)
+      return res.json({ success: false, message: "Client ID already exists" });
+    addUser(dbInstance, clientId, password, email).then(() => {
+      return res.json({ success: true, message: "Registration successful!" });
+    });
+  } catch (err) {
+    console.error("Register error:", err);
+    res.status(500).json({ success: false, message: "Internal error" });
   }
-
-  const newUser = { clientId, password, email, plan: "basic" };
-  users.users.push(newUser);
-  fs.writeFileSync("./users.json", JSON.stringify(users, null, 2));
-
-  res.json({ success: true, message: "Registration successful!" });
 });
 
-// Get client config
 app.get("/api/client/:id/config", (req, res) => {
-  const clientConfig = clients[req.params.id]?.config || {};
-  res.json(clientConfig);
-});
-
-// Update client config
-app.post("/api/client/:id/config", (req, res) => {
-  if (!clients[req.params.id]) {
-    clients[req.params.id] = { connected: false, config: {} };
-  }
-  clients[req.params.id].config = req.body;
-  res.json({ success: true, message: "Config updated!" });
-});
-
-// Get status
-app.get("/api/status", (req, res) => {
-  res.json({ status: "Connected", config });
-});
-
-// Update global config
-app.post("/api/config", (req, res) => {
-  const updatedConfig = { ...config, ...req.body };
-  fs.writeFileSync("./config.json", JSON.stringify(updatedConfig, null, 2));
-  res.json({ success: true, message: "Config updated!" });
-});
-
-// Get subscription plans
-app.get("/api/plans", (req, res) => {
+  // simple in-memory config placeholder per client
   res.json({
-    plans: {
-      basic: { price: 9.99, messages: 100 },
-      pro: { price: 29.99, messages: 1000 },
-      enterprise: { price: 99.99, messages: "unlimited" },
-    },
+    replyMessage: config.replyMessage,
+    messageDelay: config.messageDelay,
+    autoReply: config.autoReply,
   });
 });
 
-// Serve the QR code
-app.get("/api/qr", (req, res) => {
-  const qrCodeData = getQRCodeData(); // Get the latest QR code data
-  if (qrCodeData) {
-    res.json({ success: true, qrCode: qrCodeData });
-  } else {
-    res.json({ success: false, message: "QR code not available yet." });
-  }
+app.post("/api/client/:id/config", (req, res) => {
+  // persist per-client config if needed (not implemented here)
+  res.json({ success: true, message: "Config updated!" });
 });
 
-app.listen(config.port, () => {
-  console.log(`Dashboard running on http://localhost:${config.port}`);
+app.get("/api/status", (req, res) => {
+  res.json({ status: "Connected", port: config.port, clients });
 });
+
+app.get("/api/qr/:clientId", (req, res) => {
+  const qr = getQRCodeData(req.params.clientId);
+  console.log(qr);
+  if (qr) return res.json({ success: true, qr });
+  return res.json({ success: false, message: "QR not ready" });
+});
+
+// start server after DB init
+(async () => {
+  try {
+    dbInstance = await initDB();
+    app.listen(config.port, () => {
+      console.log(`Dashboard running on http://localhost:${config.port}`);
+    });
+  } catch (err) {
+    console.error("Failed to initialize DB:", err);
+    process.exit(1);
+  }
+})();
+
 module.exports = { clients };

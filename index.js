@@ -2,31 +2,34 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const fs = require("fs");
 const config = JSON.parse(fs.readFileSync("./config.json"));
-const { clients } = require("./server");
-let qrCodeData = ""; // Store the QR code data
-let serverClientId = "";
-function generateClient() {
-  console.log(`begain of generate client: ${clients[0].clientId}`);
+
+const clientsMap = new Map(); // clientId -> { client, qr }
+
+function createClientInstance(clientId) {
+  if (clientsMap.has(clientId)) return clientsMap.get(clientId).client;
+
   const client = new Client({
     puppeteer: {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       headless: config.headless,
     },
-    authStrategy: new LocalAuth({ clientId: clients[0].clientId }),
+    authStrategy: new LocalAuth({ clientId }),
   });
 
+  let qrCodeData = "";
+
   client.on("qr", async (qr) => {
-    qrCodeData = await qrcode.toDataURL(qr); // Convert QR to a Data URL
-    console.log("QR Code Data URL:", qrCodeData); // Log the QR code to the console
-    console.log("QR received, scan please!");
+    qrCodeData = await qrcode.toDataURL(qr);
+    clientsMap.set(clientId, { client, qr: qrCodeData });
+    console.log(`[${clientId}] QR generated`);
   });
 
   client.on("ready", () => {
-    console.log("Client is ready!");
+    console.log(`[${clientId}] Client ready`);
   });
 
   client.on("message", async (message) => {
-    console.log(message.body);
+    console.log(`[${clientId}] Message from ${message.from}: ${message.body}`);
     if (config.autoReply) {
       setTimeout(() => {
         message.reply(config.replyMessage);
@@ -35,13 +38,27 @@ function generateClient() {
   });
 
   client.on("disconnected", (reason) => {
-    console.log("Client was logged out", reason);
+    console.log(`[${clientId}] Disconnected:`, reason);
+    clientsMap.delete(clientId);
   });
 
   client.initialize();
+  clientsMap.set(clientId, { client, qr: qrCodeData });
+  return client;
 }
-// Export a getter function for qrCodeData
+
+function generateClient(clientId) {
+  console.log(`generateClient :${clientId}`);
+  return createClientInstance(clientId);
+}
+
+function getQRCodeData(clientId) {
+  const entry = clientsMap.get(clientId);
+  return entry ? entry.qr : null;
+}
+
 module.exports = {
-  getQRCodeData: () => qrCodeData,
   generateClient,
+  getQRCodeData,
+  clientsMap,
 };

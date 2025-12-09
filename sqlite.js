@@ -50,8 +50,10 @@ async function getUsers(db) {
 }
 
 async function getUserByName(db, userName) {
+  console.log(`get user`);
   const stmt = await db.prepare(`SELECT * FROM users WHERE name = ?`);
   const row = await stmt.get(userName);
+  console.log(row);
   return row;
 }
 
