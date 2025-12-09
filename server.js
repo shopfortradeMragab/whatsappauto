@@ -2,9 +2,12 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 require("./index"); // Ensure index.js runs in the same process
-const { getQRCodeData } = require("./index"); // Import the getter function
+const { getQRCodeData, generateClient } = require("./index"); // Import the getter function
+const { initDB, getUserByName } = require("./sqlite");
+const { generate } = require("qrcode-terminal");
 const config = JSON.parse(fs.readFileSync("./config.json"));
-const users = JSON.parse(fs.readFileSync("./users.json"));
+// const users = JSON.parse(fs.readFileSync("./users.json"));
+// require("./sqlite");
 
 const app = express();
 app.use(express.static("public"));
@@ -12,7 +15,8 @@ app.use(express.json());
 app.set("view engine", "ejs");
 
 // Store client sessions
-const clients = {};
+const clients = [];
+const db = initDB();
 
 // Dashboard page
 app.get("/", (req, res) => {
@@ -22,16 +26,26 @@ app.get("/", (req, res) => {
 // Client login
 app.post("/api/login", (req, res) => {
   const { clientId, password } = req.body;
-  const user = users.users.find(
-    (u) => u.clientId === clientId && u.password === password
-  );
+  let user = null;
+  db.then((db) =>
+    getUserByName(db, clientId).then((dbUser) => {
+      if (dbUser && dbUser.password === password) {
+        user = { clientId: dbUser.name, plan: "basic" }; // Assuming a default plan
+        clients.push(user);
+        generateClient(); // Generate a new client session
+      }
+      // const user = users.users.find(
+      //   (u) => u.clientId === clientId && u.password === password
+      // );
 
-  if (user) {
-    clients[clientId] = { connected: false, config: {}, plan: user.plan };
-    res.json({ success: true, clientId, plan: user.plan });
-  } else {
-    res.json({ success: false, message: "Invalid credentials" });
-  }
+      // if (user) {
+      //   clients[clientId] = { connected: false, config: {}, plan: user.plan };
+      //   res.json({ success: true, clientId, plan: user.plan });}
+      else {
+        res.json({ success: false, message: "Invalid credentials" });
+      }
+    })
+  );
 });
 
 // Register new client
@@ -102,3 +116,4 @@ app.get("/api/qr", (req, res) => {
 app.listen(config.port, () => {
   console.log(`Dashboard running on http://localhost:${config.port}`);
 });
+module.exports = { clients };
