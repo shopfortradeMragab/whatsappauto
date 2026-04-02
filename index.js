@@ -5,6 +5,14 @@ const config = JSON.parse(fs.readFileSync("./config.json"));
 
 const clientsMap = new Map(); // clientId -> { client, qr }
 
+/**
+ * Creates a WhatsApp client instance for the given client ID.
+ * If the client ID already exists in the clients map, returns the existing client.
+ * Otherwise, creates a new client instance and initializes it.
+ * @param {string} clientId - The unique client ID.
+ * @returns {Client} - The WhatsApp client instance.
+ */
+
 function createClientInstance(clientId) {
   if (clientsMap.has(clientId)) return clientsMap.get(clientId).client;
 
@@ -19,9 +27,15 @@ function createClientInstance(clientId) {
   let qrCodeData = "";
 
   client.on("qr", async (qr) => {
-    qrCodeData = await qrcode.toDataURL(qr);
+    // Convert the QR code to a Data URL
+    // This is necessary as the QR code is generated as a PNG image
+    // and we need to store it as a string in the clients map
+    const qrCodeBuffer = await qrcode.toBuffer(qr);
+    const qrCodeBase64 = qrCodeBuffer.toString("base64");
+    qrCodeData = `data:image/png;base64,${qrCodeBase64}`;
     clientsMap.set(clientId, { client, qr: qrCodeData });
     console.log(`[${clientId}] QR generated`);
+    // console.log(clientsMap.get(clientId));
   });
 
   client.on("ready", () => {

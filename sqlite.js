@@ -1,88 +1,129 @@
-const { DatabaseSync } = require("node:sqlite");
-// Open or create database file
-const db = new DatabaseSync("./db/whatsapp.db");
-console.log(db.location());
-async function initDB() {
-  // Create Users table
+// Install sqlite3 first:
+// npm install sqlite3
 
-  await db.exec(`
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const dbPath = path.resolve('./db/whatsapp.db');
+
+// Open or create database file
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+  } else {
+    console.log('Connected to database at:', dbPath);
+  }
+});
+
+// Helper: wrap db.run/db.get/db.all in Promises
+function runAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve(this); // this.lastID, this.changes available
+    });
+  });
+}
+
+function getAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function allAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+// Initialize DB
+async function initDB() {
+  await runAsync(`
     CREATE TABLE IF NOT EXISTS users (
       user_id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       password TEXT NOT NULL
     )
   `);
-  // Create Messages table
-  await db.exec(`
+
+  await runAsync(`
     CREATE TABLE IF NOT EXISTS messages (
       message_id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       receivemsg TEXT NOT NULL,
       sendmsg TEXT NOT NULL
-      
     )
   `);
+
   return db;
 }
 
 // Insert a user
-async function addUser(db, name, password) {
-  const stmt = await db.prepare(
-    `INSERT INTO users (name, password) VALUES (?, ?)`
+async function addUser(name, password) {
+  const result = await runAsync(
+    `INSERT INTO users (name, password) VALUES (?, ?)`,
+    [name, password]
   );
-  const result = await stmt.run(name, password);
-  console.log(`User : ${name} added`);
+  console.log(`User : ${name} added with id ${result.lastID}`);
 }
+
 // Insert a message
-async function addMessage(db, userId, receivemsg, sendmsg) {
-  const stmt = await db.prepare(
-    `INSERT INTO messages (user_id, receivemsg, sendmsg ) VALUES (?, ?, ?)`
+async function addMessage(userId, receivemsg, sendmsg) {
+  const result = await runAsync(
+    `INSERT INTO messages (user_id, receivemsg, sendmsg) VALUES (?, ?, ?)`,
+    [userId, receivemsg, sendmsg]
   );
-  const result = await stmt.run(userId, receivemsg, sendmsg);
-  console.log(`Message logged with ID: ${result.lastInsertRowid}`);
+  console.log(`Message logged with ID: ${result.lastID}`);
 }
 
-// Added: read user(s) and read message(s)
-async function getUsers(db) {
-  const stmt = await db.prepare(`SELECT * FROM users ORDER BY user_id ASC`);
-  const rows = await stmt.all();
-  return rows;
+// Read users
+async function getUsers() {
+  return await allAsync(`SELECT * FROM users ORDER BY user_id ASC`);
 }
 
-async function getUserByName(db, userName) {
-  console.log(`get user`);
-  const stmt = await db.prepare(`SELECT * FROM users WHERE name = ?`);
-  const row = await stmt.get(userName);
+async function getUserByName(userName) {
+  const row = await getAsync(`SELECT * FROM users WHERE name = ?`, [userName]);
   console.log(row);
   return row;
 }
 
-async function getAllMessages(db, limit = 100) {
-  const stmt = await db.prepare(
-    `SELECT m.*, u.name FROM messages m LEFT JOIN users u ON m.user_id = u.user_id ORDER BY m.message_id DESC LIMIT ?`
+async function getAllMessages(limit = 100) {
+  return await allAsync(
+    `SELECT m.*, u.name 
+     FROM messages m 
+     LEFT JOIN users u ON m.user_id = u.user_id 
+     ORDER BY m.message_id DESC LIMIT ?`,
+    [limit]
   );
-  const rows = await stmt.all(limit);
-  return rows;
 }
 
-async function getMessagesByUser(db, userId, limit = 100) {
-  const stmt = await db.prepare(
-    `SELECT m.*, u.name FROM messages m LEFT JOIN users u ON m.user_id = u.user_id WHERE m.user_id = ? ORDER BY m.message_id DESC LIMIT ?`
+async function getMessagesByUser(userId, limit = 100) {
+  return await allAsync(
+    `SELECT m.*, u.name 
+     FROM messages m 
+     LEFT JOIN users u ON m.user_id = u.user_id 
+     WHERE m.user_id = ? 
+     ORDER BY m.message_id DESC LIMIT ?`,
+    [userId, limit]
   );
-  const rows = await stmt.all(userId, limit);
-  return rows;
 }
 
-// db.prepare().get().
 // Example usage
-// (async () => {
-//   const db = await initDB();
+(async () => {
+  await initDB();
+  await addUser("Alice", "hashed_password_here");
+  await addMessage(1, "receivemsg", "sendmsg");
+  const users = await getUsers();
+  console.log(users);
+})();
 
-//   await addUser(db, "Alice", "hashed_password_here");
-//   await addMessage(db, 1, "receivemsg", "sendmsg");
-//   await addMessage(db, 1, "send", "Hi there!");
-// })();
-// getUsers(db).then((users) => console.log(users));
 module.exports = {
   initDB,
   addUser,
