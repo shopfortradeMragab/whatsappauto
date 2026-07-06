@@ -75,10 +75,10 @@ async function getUserByName(userName) {
 
 async function addUser(name, password, email) {
   // email column not in schema, but you can add if needed
-  return await runAsync(
-    `INSERT INTO users (name, password) VALUES (?, ?)`,
-    [name, password]
-  );
+  return await runAsync(`INSERT INTO users (name, password) VALUES (?, ?)`, [
+    name,
+    password,
+  ]);
 }
 
 // --- Express routes ---

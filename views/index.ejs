@@ -456,10 +456,10 @@
 
       // Fetch QR Code
       async function fetchQRCode() {
-                const clientId = document.getElementById("clientId").value;
-
-        const response = await fetch(`/api/qr/${clientId}`);
-        console.log(clientId)
+                //const clientId = document.getElementById("clientId").value;
+if (!currentClientId) return; // no client logged in
+        const response = await fetch(`/api/qr/${currentClientId}`);
+        console.log(`clientId:${currentClientId}`);
         const data = await response.json();
         const qrContainer = document.getElementById("qr-container");
         const qrMessage = document.getElementById("qr-message");

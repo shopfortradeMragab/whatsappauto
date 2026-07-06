@@ -1,6 +1,8 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const fs = require("fs");
+const path = require("path");
+const { exec } = require("child_process");
 const config = JSON.parse(fs.readFileSync("./config.json"));
 
 const clientsMap = new Map(); // clientId -> { client, qr }
@@ -14,6 +16,7 @@ const clientsMap = new Map(); // clientId -> { client, qr }
  */
 
 function createClientInstance(clientId) {
+  cleanSessionFolder(clientId); // Clean up old session data before creating a new client
   if (clientsMap.has(clientId)) return clientsMap.get(clientId).client;
 
   const client = new Client({
@@ -36,6 +39,16 @@ function createClientInstance(clientId) {
     clientsMap.set(clientId, { client, qr: qrCodeData });
     console.log(`[${clientId}] QR generated`);
     // console.log(clientsMap.get(clientId));
+  });
+
+  client.on("authenticated", () => {
+    console.log(`[${clientId}] Authenticated successfully`);
+  });
+  client.on("auth_failure", (msg) => {
+    console.error(`[${clientId}] Authentication failed:`, msg);
+  });
+  client.on("loading_screen", (percent, message) => {
+    console.log(`[${clientId}] Loading: ${percent}% ${message}`);
   });
 
   client.on("ready", () => {
@@ -69,6 +82,50 @@ function generateClient(clientId) {
 function getQRCodeData(clientId) {
   const entry = clientsMap.get(clientId);
   return entry ? entry.qr : null;
+}
+
+function cleanSessionFolder(clientId) {
+  const sessionPath = path.join(
+    process.cwd(),
+    ".wwebjs_auth",
+    `session-${clientId}`,
+  );
+  if (fs.existsSync(sessionPath)) {
+    try {
+      fs.rmSync(sessionPath, { recursive: true, force: true });
+      // setTimeout(() => {
+      if (!fs.existsSync(sessionPath)) {
+        console.log(`[${clientId}] Old session folder removed`);
+      } else {
+        console.warn(`[${clientId}] Folder still locked, restarting app...`);
+        //restartApp(clientId); // pass clientId
+      }
+      // }, 2000);
+    } catch (err) {
+      console.warn(
+        `[${clientId}] Failed to remove session folder:`,
+        err.message,
+      );
+      //restartApp(clientId);
+    }
+  }
+}
+
+function restartApp(clientId) {
+  // Batch file in the same directory as server.js
+  const batFile = path.join(__dirname, "restart_whatsappauto.bat");
+
+  // Pass clientId as an argument to the batch file
+  exec(`"${batFile}" ${clientId}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error running batch file: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`Batch stderr: ${stderr}`);
+    }
+    console.log(`Batch stdout:\n${stdout}`);
+  });
 }
 
 module.exports = {
